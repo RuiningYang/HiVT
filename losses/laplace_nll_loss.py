@@ -15,28 +15,36 @@ import torch
 import torch.nn as nn
 
 
+# 定义拉普拉斯分布的负对数似然损失类
 class LaplaceNLLLoss(nn.Module):
 
+    # 初始化函数
     def __init__(self,
-                 eps: float = 1e-6,
-                 reduction: str = 'mean') -> None:
+                 eps: float = 1e-6,  # 用于确保尺度参数不为零的小正数
+                 reduction: str = 'mean') -> None:  # 损失降维方式，可选'mean'、'sum'或'none'
         super(LaplaceNLLLoss, self).__init__()
-        self.eps = eps
-        self.reduction = reduction
+        self.eps = eps  # 保存eps参数
+        self.reduction = reduction  # 保存降维方式
 
+    # 前向传播函数
     def forward(self,
-                pred: torch.Tensor,
-                target: torch.Tensor) -> torch.Tensor:
+                pred: torch.Tensor,  # 预测值，假设最后一个维度包含位置（loc）和尺度（scale）参数
+                target: torch.Tensor) -> torch.Tensor:  # 目标值
+        # 将预测值分为位置（loc）和尺度（scale）参数
         loc, scale = pred.chunk(2, dim=-1)
-        scale = scale.clone()
+        scale = scale.clone()  # 克隆尺度参数以避免修改原始预测值
         with torch.no_grad():
+            # 限制尺度参数的最小值为eps，避免除以零
             scale.clamp_(min=self.eps)
+        # 计算负对数似然损失
         nll = torch.log(2 * scale) + torch.abs(target - loc) / scale
+        # 根据reduction参数决定损失的降维方式
         if self.reduction == 'mean':
-            return nll.mean()
+            return nll.mean()  # 返回平均损失
         elif self.reduction == 'sum':
-            return nll.sum()
+            return nll.sum()  # 返回总损失
         elif self.reduction == 'none':
-            return nll
+            return nll  # 不降维，返回每个样本的损失
         else:
             raise ValueError('{} is not a valid value for reduction'.format(self.reduction))
+
